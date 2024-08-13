@@ -63,7 +63,7 @@ fn main() -> io::Result<()> {
             let height: usize = args.next()
                 .unwrap().trim().parse()
                 .expect("Please provide the width and height as integers");
-            let mines = (width * height) / 10;
+            let mines = (width * height) / 5;
             (width, height, mines)
         },
         3 => {
