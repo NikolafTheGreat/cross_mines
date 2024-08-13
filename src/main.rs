@@ -56,6 +56,16 @@ fn main() -> io::Result<()> {
                 .expect("Please provide the number of mines as integers");
             (width, height, mines)
         },
+        2 => {
+            let width: usize = args.next()
+                .unwrap().trim().parse()
+                .expect("Please provide the width and height as integers");
+            let height: usize = args.next()
+                .unwrap().trim().parse()
+                .expect("Please provide the width and height as integers");
+            let mines = (width * height) / 10;
+            (width, height, mines)
+        },
         3 => {
             let width: usize = args.next()
                 .unwrap().trim().parse()
@@ -73,9 +83,12 @@ fn main() -> io::Result<()> {
         }
     };
 
+    if mines >= width * height {
+        panic!("Please choose a number of mines that fits on the board.");
+    }
     if width * 2 > window_width as usize || height > window_height as usize {
         panic!("Please provide a width and height that \
-            fit within the current terminal frame. \
+            fits within the current terminal frame. \
             \nThe current terminal frame can at max fit: ({}, {})",
             window_width / 2, window_height
         );
@@ -190,17 +203,18 @@ fn main() -> io::Result<()> {
         } else {
             (" GAME OVER! ", Color::Red)
         };
+        let y_offset = if height == 1 { 1 } else { 0 };
         execute!(stdout,
             style::SetForegroundColor(color),
-            cursor::MoveTo((width * 2 - message.len() - 4) as u16 / 2, height as u16 / 2 - 1),
+            cursor::MoveTo((width * 2).saturating_sub(message.len()).saturating_sub(4) as u16 / 2, (height + y_offset) as u16 / 2 - 1),
             style::Print(" ╭"),
             style::Print("─".repeat(message.len())),
             style::Print("╮ "),
-            cursor::MoveTo((width * 2 - message.len() - 4) as u16 / 2, height as u16 / 2),
+            cursor::MoveTo((width * 2).saturating_sub(message.len()).saturating_sub(4) as u16 / 2, (height + y_offset) as u16 / 2),
             style::Print(" │"),
             style::Print(message),
             style::Print("│ "),
-            cursor::MoveTo((width * 2 - message.len() - 4) as u16 / 2, height as u16 / 2 + 1),
+            cursor::MoveTo((width * 2).saturating_sub(message.len()).saturating_sub(4) as u16 / 2, (height + y_offset) as u16 / 2 + 1),
             style::Print(" ╰"),
             style::Print("─".repeat(message.len())),
             style::Print("╯ "),
@@ -290,6 +304,8 @@ fn reveal(
     }
     if minefield[x][y].is_uncovered && !clicked {return Ok(Some(0))}
 
+    let mut return_value = if minefield[x][y].is_uncovered { 0 } else { 1 };
+
     minefield[x][y].is_uncovered = true;
     execute!(stdout,
         cursor::MoveTo(x as u16 * 2, y as u16),
@@ -298,7 +314,6 @@ fn reveal(
     )?;
 
     if minefield[x][y].neighbors == minefield[x][y].flagged_neighbors as usize {
-        let mut return_value = 1;
         return_value += if let Some(v) = reveal(stdout, minefield, x_s - 1, y_s - 1, width, height, false)? {v} else {return Ok(None)};
         return_value += if let Some(v) = reveal(stdout, minefield, x_s - 1, y_s + 1, width, height, false)? {v} else {return Ok(None)};
         return_value += if let Some(v) = reveal(stdout, minefield, x_s + 1, y_s - 1, width, height, false)? {v} else {return Ok(None)};
@@ -307,10 +322,9 @@ fn reveal(
         return_value += if let Some(v) = reveal(stdout, minefield, x_s + 1, y_s, width, height, false)? {v} else {return Ok(None)};
         return_value += if let Some(v) = reveal(stdout, minefield, x_s, y_s - 1, width, height, false)? {v} else {return Ok(None)};
         return_value += if let Some(v) = reveal(stdout, minefield, x_s, y_s + 1, width, height, false)? {v} else {return Ok(None)};
-        return Ok(Some(return_value));
     }
 
-    Ok(Some(1))
+    Ok(Some(return_value))
 }
 
 fn flag(
@@ -321,6 +335,9 @@ fn flag(
     width: usize,
     height: usize
 ) -> io::Result<()> {
+    if x >= width || y >= height {return Ok(())}
+
+
     if minefield[x][y].is_uncovered {return Ok(())}
 
     minefield[x][y].is_flagged = !minefield[x][y].is_flagged;
