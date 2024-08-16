@@ -45,7 +45,7 @@ fn main() -> io::Result<()> {
     let (width, height, mines) = match args.len() {
         0 => {
             let width = (window_width as usize / 2) & !1;
-            let height = (window_height as usize) & !1;
+            let height = (window_height as usize) - 2;
             let mines = (width * height) / 5;
             (width, height, mines)
         },
@@ -113,6 +113,14 @@ fn main() -> io::Result<()> {
                 )?;
             }
         }
+        execute!(stdout,
+            style::SetForegroundColor(Color::Red),
+            cursor::MoveTo(0, height as u16),
+            style::Print(format!("󰷚 :{:<20}", mines)),
+            style::SetForegroundColor(Color::Green),
+            cursor::MoveTo(0, height as u16 + 1),
+            style::Print(format!(" :{:<20}", 0)),
+        )?;
 
         let (first_x, first_y) = loop {
             let first_event = event::read()?;
@@ -140,6 +148,8 @@ fn main() -> io::Result<()> {
         );
 
         let mut covered = width * height;
+
+        let mut flags = 0;
 
         covered -= reveal(
             &mut stdout,
@@ -182,20 +192,31 @@ fn main() -> io::Result<()> {
                                     break 'game false;
                                 }
                             },
-                            MouseButton::Right => flag(
-                                &mut stdout,
-                                &mut minefield,
-                                mouse_event.column as usize / 2,
-                                mouse_event.row as usize,
-                                width,
-                                height
-                            )?,
+                            MouseButton::Right => {
+                                let flagged = flag(
+                                    &mut stdout,
+                                    &mut minefield,
+                                    mouse_event.column as usize / 2,
+                                    mouse_event.row as usize,
+                                    width,
+                                    height
+                                )?;
+                                flags += flagged;
+                            },
                             _ => ()
                         }
                     }
                 },
                 _ => ()
             }
+            execute!(stdout,
+                style::SetForegroundColor(Color::Red),
+                cursor::MoveTo(0, height as u16),
+                style::Print(format!("󰷚 :{:<20}", mines as isize - flags)),
+                style::SetForegroundColor(Color::Green),
+                cursor::MoveTo(0, height as u16 + 1),
+                style::Print(format!(" :{:<20}", flags)),
+            )?;
         };
 
         let (message, color) = if won {
@@ -334,11 +355,9 @@ fn flag(
     y: usize,
     width: usize,
     height: usize
-) -> io::Result<()> {
-    if x >= width || y >= height {return Ok(())}
-
-
-    if minefield[x][y].is_uncovered {return Ok(())}
+) -> io::Result<isize> {
+    if x >= width || y >= height {return Ok(0)}
+    if minefield[x][y].is_uncovered {return Ok(0)}
 
     minefield[x][y].is_flagged = !minefield[x][y].is_flagged;
     let diff = if minefield[x][y].is_flagged {1} else {-1};
@@ -360,8 +379,9 @@ fn flag(
     )?;
     if minefield[x][y].is_flagged {
         execute!(stdout, style::Print(" "))?;
+        Ok(1)
     } else {
         execute!(stdout, style::Print(" "))?;
+        Ok(-1)
     }
-    Ok(())
 }
